@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simplex Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* Light Theme Palette */
+    --paper: #F4F7F7;
+    --paper-2: #E8ECEE;
+    --card: #FFFFFF;
+    --ink: #182025;
+    --ink-soft: #5C6A75;
+    --line: #CFD6DC;
+    --line-soft: #E1E6EB;
+    
+    --accent: #005FCD;
+    --accent-hover: #004BA3;
+    --accent-ink: #00224A;
+    --accent-soft: #E0EFFF; /* Coluna Pivô */
+    
+    --pivot: #F59B15;       /* Elemento Pivô */
+    --pivot-soft: #FEF2DE;  /* Linha Pivô */
+    --pivot-ink: #5C3A00;
+    
+    --good: #147047;
+    --good-soft: #DFF1E8;
+    --bad: #D93D42;
+    --bad-soft: #FDE2E2;
+    
+    --radius-sharp: 6px;
+    --radius-soft: 12px;
+    --dur: 150ms;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 8px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.03);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #111315;
+      --paper-2: #191D20;
+      --card: #1D2125;
+      --ink: #EAECEE;
+      --ink-soft: #919CA4;
+      --line: #383F45;
+      --line-soft: #2C3237;
+      
+      --accent: #4B9EFF;
+      --accent-hover: #73B5FF;
+      --accent-ink: #D1E5FF;
+      --accent-soft: #122B4A; 
+      
+      --pivot: #F59B15;       
+      --pivot-soft: #382811;  
+      --pivot-ink: #FEE8C8;
+      
+      --good: #3CA15B;
+      --good-soft: #132D1B;
+      --bad: #E5484D;
+      --bad-soft: #3A1516;
+      
+      --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+      --shadow-md: 0 6px 12px rgba(0,0,0,0.4);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #111315;
+    --paper-2: #191D20;
+    --card: #1D2125;
+    --ink: #EAECEE;
+    --ink-soft: #919CA4;
+    --line: #383F45;
+    --line-soft: #2C3237;
+    --accent: #4B9EFF;
+    --accent-hover: #73B5FF;
+    --accent-ink: #D1E5FF;
+    --accent-soft: #122B4A; 
+    --pivot: #F59B15;       
+    --pivot-soft: #382811;  
+    --pivot-ink: #FEE8C8;
+    --good: #3CA15B;
+    --good-soft: #132D1B;
+    --bad: #E5484D;
+    --bad-soft: #3A1516;
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+    --shadow-md: 0 6px 12px rgba(0,0,0,0.4);
+  }
+
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  a:hover { text-decoration: underline; }
+  ::selection { background: var(--accent-soft); color: var(--accent-ink); }
+
+  .wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  /* ---------- header ---------- */
+  header.top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 28px;
+    animation: fadeIn 0.4s ease-out;
+  }
+  h1.title {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(32px, 6vw, 48px);
+    line-height: 1;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  h1.title em {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .subtitle {
+    max-width: 65ch;
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin: 0;
+  }
+  .theme-toggle {
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink-soft);
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--dur);
+    box-shadow: var(--shadow-sm);
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-soft);
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    animation: slideUp 0.3s ease-out forwards;
+  }
+  .card h2 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  .card .hint {
+    color: var(--ink-soft);
+    font-size: 13px;
+    margin: 0 0 20px;
+  }
+
+  /* ---------- config row ---------- */
+  .config-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .field input[type="number"], .field select {
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--paper-2);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 6px 10px;
+    width: 90px;
+    transition: all var(--dur);
+  }
+  .field select { width: auto; padding-right: 28px; cursor: pointer; font-weight: 500; }
+  .field input:hover, .field select:hover { background: var(--line-soft); }
+  .field input:focus-visible, .field select:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--card);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+
+  /* ---------- equation styling ---------- */
+  .eq-block { 
+    margin-bottom: 20px; 
+  }
+  .eq-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  
+  .eq-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 4px;
+    font-size: 15px;
+    background: var(--paper-2);
+    padding: 12px 16px;
+    border-radius: var(--radius-sharp);
+    border: 1px solid var(--line-soft);
+  }
+  .eq-row .z-label {
+    font-family: "Fraunces", Georgia, serif;
+    font-style: italic;
+    font-size: 18px;
+    font-weight: 600;
+    margin-right: 8px;
+    color: var(--ink);
+  }
+  
+  .term {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .plus { color: var(--ink-soft); margin: 0 2px; font-weight: 500; font-size: 14px; }
+  
+  .coef {
+    width: 3.2em;
+    text-align: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--line);
+    padding: 4px 2px;
+    border-radius: 4px;
+    transition: all var(--dur);
+  }
+  .coef:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  .varname { font-size: 14px; color: var(--ink); font-weight: 600; }
+
+  /* Lista de restrições */
+  #consList {
+    background: var(--paper-2);
+    padding: 4px 16px;
+    border-radius: var(--radius-sharp);
+    border: 1px solid var(--line-soft);
+  }
+  .cons-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .cons-row:last-child { border-bottom: none; }
+  .cons-index {
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 600;
+    width: 20px;
+  }
+  
+  .rel-select {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 4px 6px;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .rel-select:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+  
+  .rhs {
+    width: 4.5em;
+    text-align: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 4px 6px;
+  }
+  .rhs:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+
+  /* ---------- buttons ---------- */
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  button.solve {
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    padding: 10px 24px;
+    cursor: pointer;
+    transition: all var(--dur);
+    box-shadow: var(--shadow-sm);
+  }
+  button.solve:hover { background: var(--accent-hover); transform: translateY(-1px); }
+  button.solve:active { transform: translateY(0); }
+  
+  button.ghost {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 9px 16px;
+    cursor: pointer;
+    transition: all var(--dur);
+  }
+  button.ghost:hover { border-color: var(--ink-soft); color: var(--ink); background: var(--paper-2); }
+  
+  .err-msg {
+    color: var(--bad);
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 16px;
+    display: none;
+    background: var(--bad-soft);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--bad);
+  }
+  .err-msg.show { display: inline-block; animation: fadeIn 0.2s; }
+
+  /* ---------- results ---------- */
+  #results { display: none; margin-top: 40px; }
+  #results.show { display: block; animation: slideUp 0.4s ease-out forwards; }
+  
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .results-header h2 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 24px;
+    margin: 0;
+    color: var(--ink);
+  }
+  
+  /* Legend Box - Compacto */
+  .legend {
+    display: flex;
+    gap: 12px;
+    background: var(--card);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: var(--shadow-sm);
+    flex-wrap: wrap;
+    color: var(--ink-soft);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-box { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); }
+  .box-enter { background: var(--accent-soft); }
+  .box-leave { background: var(--pivot-soft); }
+  .box-pivot { background: var(--pivot); border: 1px solid var(--pivot-ink); }
+
+  .iter-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-soft);
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .iter-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .iter-heading .n {
+    font-family: "Fraunces", Georgia, serif;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 20px;
+    color: var(--ink);
+  }
+  .iter-heading .badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--good);
+    background: var(--good-soft);
+    border-radius: 8px;
+    padding: 2px 8px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sharp);
+    background: var(--card);
+  }
+  table.tableau {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 520px;
+    font-size: 13px; /* Tabela mais densa */
+  }
+  table.tableau th, table.tableau td {
+    border: 1px solid var(--line-soft);
+    padding: 6px 10px; /* Paddings reduzidos */
+    text-align: center;
+    white-space: nowrap;
+  }
+  table.tableau tbody tr:hover td { background: var(--paper-2); }
+  
+  table.tableau thead tr.cj-row th {
+    background: var(--paper-2);
+    color: var(--ink-soft);
+    font-weight: 600;
+    font-size: 12px;
+  }
+  table.tableau thead tr.head-row th {
+    background: var(--paper);
+    font-weight: 600;
+    color: var(--ink);
+  }
+  table.tableau tbody td.base-name, table.tableau tbody td.cb-val {
+    background: var(--paper);
+    font-weight: 600;
+  }
+  table.tableau tfoot td, table.tableau tfoot th {
+    background: var(--paper);
+    font-weight: 600;
+  }
+  table.tableau tfoot tr.delta-row td, table.tableau tfoot tr.delta-row th {
+    color: var(--accent);
+    background: var(--paper-2);
+    font-weight: 600;
+  }
+  
+  /* --- Pivot Coloring Classes --- */
+  .col-enter { 
+    background-color: var(--accent-soft) !important; 
+    color: var(--accent-ink); 
+    font-weight: 600;
+  }
+  .row-leave td { 
+    background-color: var(--pivot-soft) !important; 
+    color: var(--ink);
+  }
+  table.tableau td.pivot-cell {
+    background-color: var(--pivot) !important;
+    color: #111 !important; 
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); 
+    outline: 1.5px solid var(--pivot-ink); 
+    outline-offset: -1.5px;
+    position: relative;
+    z-index: 10;
+  }
+  
+  .ratio-col { color: var(--ink-soft); font-size: 12.5px; font-weight: 500; }
+
+  .iter-note {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 16px 0 0;
+    padding: 10px 14px;
+    background: var(--paper-2);
+    border-radius: 6px;
+    border-left: 3px solid var(--accent);
+    line-height: 1.4;
+  }
+  .iter-note b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- outcome panel ---------- */
+  .outcome {
+    border-radius: var(--radius-soft);
+    padding: 24px;
+    margin-top: 8px;
+    box-shadow: var(--shadow-sm);
+  }
+  .outcome.ok { background: var(--good-soft); border: 1px solid var(--good); }
+  .outcome.bad { background: var(--bad-soft); border: 1px solid var(--bad); }
+  .outcome h3 {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .outcome.ok h3 { color: var(--good); }
+  .outcome.bad h3 { color: var(--bad); }
+  .outcome p { margin: 0 0 16px; font-size: 14px; color: var(--ink); }
+  
+  .z-star {
+    font-family: "Fraunces", Georgia, serif;
+    font-style: italic;
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--good);
+  }
+  .var-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .var-chip {
+    background: var(--card);
+    border: 1px solid var(--good);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+  .var-chip .k { color: var(--ink-soft); margin-right: 6px; font-weight: 500; }
+
+  footer {
+    margin-top: 56px;
+    color: var(--ink-soft);
+    font-size: 12px;
+    text-align: center;
+    border-top: 1px solid var(--line-soft);
+    padding-top: 24px;
+  }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 24px 16px 64px; }
+    .card { padding: 20px 16px; }
+    h1.title { font-size: 32px; }
+    .config-row { gap: 16px; flex-direction: column; }
+    .actions { flex-direction: column; align-items: stretch; }
+    .actions button { width: 100%; }
+    .iter-card { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1 class="title">Simplex<em>.</em>Engine</h1>
+      <p class="subtitle">Monte o modelo, aperte resolver e acompanhe cada pivô do método Big&nbsp;M até a solução ótima.</p>
+    </div>
+    <button class="theme-toggle" id="themeToggle" title="Alternar tema" aria-label="Alternar tema">☾</button>
+  </header>
+
+  <section class="card">
+    <h2>Modelo</h2>
+    <p class="hint">Defina o tamanho do problema. Variáveis são sempre não negativas (x &ge; 0).</p>
+
+    <div class="config-row">
+      <div class="field">
+        <label for="numVars">Variáveis</label>
+        <input type="number" id="numVars" min="1" max="6" value="2">
+      </div>
+      <div class="field">
+        <label for="numCons">Restrições</label>
+        <input type="number" id="numCons" min="1" max="8" value="3">
+      </div>
+      <div class="field">
+        <label for="objType">Objetivo</label>
+        <select id="objType">
+          <option value="max">Maximizar</option>
+          <option value="min">Minimizar</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="eq-block">
+      <div class="eq-label">Função Objetivo</div>
+      <div class="eq-row" id="objRow"></div>
+    </div>
+
+    <div class="eq-block" style="margin-bottom:0;">
+      <div class="eq-label">Restrições (Sujeitas A)</div>
+      <div id="consList"></div>
+    </div>
+
+    <div class="actions">
+      <button class="solve" id="solveBtn">Resolver Simplex</button>
+      <button class="ghost" id="resetBtn">Carregar Exemplo Padrão</button>
+    </div>
+    <div class="err-msg" id="errMsg"></div>
+  </section>
+
+  <section id="results"></section>
+
+  <footer>método das duas fases via Big&nbsp;M · cálculo simbólico, sem arredondar M</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- theme ---------------- */
+  var root = document.documentElement;
+  var toggle = document.getElementById('themeToggle');
+  try{
+    var saved = localStorage.getItem('simplex-theme');
+    if(saved){ root.setAttribute('data-theme', saved); toggle.textContent = saved === 'dark' ? '☀' : '☾'; }
+  }catch(e){}
+  toggle.addEventListener('click', function(){
+    var cur = root.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    toggle.textContent = next === 'dark' ? '☀' : '☾';
+    try{ localStorage.setItem('simplex-theme', next); }catch(e){}
+  });
+
+  /* ---------------- subscripts ---------------- */
+  var SUBS = ['₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'];
+  function sub(n){
+    return String(n).split('').map(function(d){ return SUBS[+d]; }).join('');
+  }
+
+  /* ---------------- form state & rendering ---------------- */
+  var numVarsInput = document.getElementById('numVars');
+  var numConsInput = document.getElementById('numCons');
+  var objTypeSelect = document.getElementById('objType');
+  var objRow = document.getElementById('objRow');
+  var consList = document.getElementById('consList');
+
+  var model = {
+    obj: [3,5],
+    cons: [
+      {coef:[1,0], rel:'<=', rhs:4},
+      {coef:[0,2], rel:'<=', rhs:12},
+      {coef:[3,2], rel:'<=', rhs:18}
+    ],
+    type: 'max'
+  };
+
+  function readModelFromDOM(){
+    var n = model.obj.length, m = model.cons.length;
+    var objInputs = objRow.querySelectorAll('.coef');
+    for(var j=0;j<n;j++){ model.obj[j] = parseFloat(objInputs[j].value) || 0; }
+    var rows = consList.querySelectorAll('.cons-row');
+    for(var i=0;i<m;i++){
+      var row = rows[i];
+      var coefs = row.querySelectorAll('.coef');
+      for(var j2=0;j2<n;j2++){ model.cons[i].coef[j2] = parseFloat(coefs[j2].value) || 0; }
+      model.cons[i].rel = row.querySelector('.rel-select').value;
+      model.cons[i].rhs = parseFloat(row.querySelector('.rhs').value) || 0;
+    }
+    model.type = objTypeSelect.value;
+  }
+
+  function resizeModel(newN, newM){
+    var oldN = model.obj.length;
+    var newObj = new Array(newN).fill(0);
+    for(var j=0;j<Math.min(oldN,newN);j++) newObj[j] = model.obj[j];
+    model.obj = newObj;
+
+    var newCons = [];
+    for(var i=0;i<newM;i++){
+      var base = model.cons[i] || {coef:[], rel:'<=', rhs:0};
+      var coef = new Array(newN).fill(0);
+      for(var j2=0;j2<Math.min(base.coef.length,newN);j2++) coef[j2] = base.coef[j2];
+      newCons.push({coef:coef, rel: base.rel || '<=', rhs: base.rhs || 0});
+    }
+    model.cons = newCons;
+  }
+
+  function renderForm(){
+    var n = model.obj.length, m = model.cons.length;
+
+    // objective row
+    var html = '<span class="z-label">Z =</span>';
+    for(var j=0;j<n;j++){
+      if(j>0) html += '<span class="plus">+</span>';
+      html += '<span class="term"><input class="coef" type="number" step="any" data-j="'+j+'" value="'+model.obj[j]+'"><span class="varname">x'+sub(j+1)+'</span></span>';
+    }
+    objRow.innerHTML = html;
+
+    // constraints
+    var chtml = '';
+    for(var i=0;i<m;i++){
+      var c = model.cons[i];
+      chtml += '<div class="cons-row" data-i="'+i+'"><div class="cons-index">'+(i+1)+'.</div>';
+      for(var j2=0;j2<n;j2++){
+        if(j2>0) chtml += '<span class="plus">+</span>';
+        chtml += '<span class="term"><input class="coef" type="number" step="any" data-j="'+j2+'" value="'+c.coef[j2]+'"><span class="varname">x'+sub(j2+1)+'</span></span>';
+      }
+      chtml += '<select class="rel-select">'+
+        '<option value="<="'+(c.rel==='<='?' selected':'')+'>&le;</option>'+
+        '<option value="="'+(c.rel==='='?' selected':'')+'>=</option>'+
+        '<option value=">="'+(c.rel==='>='?' selected':'')+'>&ge;</option>'+
+        '</select>'+
+        '<input class="rhs" type="number" step="any" value="'+c.rhs+'">'+
+        '</div>';
+    }
+    consList.innerHTML = chtml;
+    objTypeSelect.value = model.type;
+  }
+
+  numVarsInput.addEventListener('change', function(){
+    readModelFromDOM();
+    var n = Math.max(1, Math.min(6, parseInt(numVarsInput.value)||2));
+    numVarsInput.value = n;
+    resizeModel(n, model.cons.length);
+    renderForm();
+  });
+  numConsInput.addEventListener('change', function(){
+    readModelFromDOM();
+    var m = Math.max(1, Math.min(8, parseInt(numConsInput.value)||1));
+    numConsInput.value = m;
+    resizeModel(model.obj.length, m);
+    renderForm();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    model = {
+      obj:[3,5],
+      cons:[
+        {coef:[1,0], rel:'<=', rhs:4},
+        {coef:[0,2], rel:'<=', rhs:12},
+        {coef:[3,2], rel:'<=', rhs:18}
+      ],
+      type:'max'
+    };
+    numVarsInput.value = 2;
+    numConsInput.value = 3;
+    renderForm();
+    var resDiv = document.getElementById('results');
+    resDiv.classList.remove('show');
+    setTimeout(function() { resDiv.innerHTML = ''; }, 200);
+  });
+
+  renderForm();
+
+  /* ---------------- Big-M simplex engine ---------------- */
+  var EPS = 1e-9;
+
+  function pairAdd(p,q){ return [p[0]+q[0], p[1]+q[1]]; }
+  function pairSub(p,q){ return [p[0]-q[0], p[1]-q[1]]; }
+  function pairScale(p,s){ return [p[0]*s, p[1]*s]; }
+  function cmpPair(p,q){
+    if(Math.abs(p[1]-q[1]) > EPS) return p[1]-q[1];
+    return p[0]-q[0];
+  }
+  function fmtNum(x){
+    if(Math.abs(x) < 1e-9) x = 0;
+    var r = Math.round(x*1000)/1000;
+    if(Object.is(r,-0)) r = 0;
+    return (r % 1 === 0) ? String(r) : String(r).replace(/0+$/,'').replace(/\.$/,'');
+  }
+  function fmtPair(p){
+    var real = p[0], mc = p[1];
+    if(Math.abs(mc) < 1e-9){
+      return fmtNum(real);
+    }
+    var mpart;
+    if(Math.abs(mc-1) < 1e-9) mpart = 'M';
+    else if(Math.abs(mc+1) < 1e-9) mpart = '-M';
+    else mpart = fmtNum(mc) + 'M';
+    if(Math.abs(real) < 1e-9) return mpart;
+    var sign = real > 0 ? ' + ' : ' - ';
+    return mpart + sign + fmtNum(Math.abs(real));
+  }
+
+  function solveSimplex(objType, objCoeffs, constraints){
+    var n = objCoeffs.length;
+    var cons = constraints.map(function(c){
+      var coeffs = c.coef.slice(), rel = c.rel, rhs = c.rhs;
+      if(rhs < 0){
+        coeffs = coeffs.map(function(v){ return -v; });
+        rhs = -rhs;
+        if(rel==='<=') rel='>=';
+        else if(rel==='>=') rel='<=';
+      }
+      return {coeffs:coeffs, rel:rel, rhs:rhs};
+    });
+    var m = cons.length;
+    var sign = objType === 'min' ? -1 : 1;
+    var cInternal = objCoeffs.map(function(v){ return sign*v; });
+
+    var columns = [];
+    for(var j=0;j<n;j++){
+      var rows = new Array(m).fill(0);
+      for(var i=0;i<m;i++) rows[i] = cons[i].coeffs[j];
+      columns.push({name:'x'+sub(j+1), cost:[cInternal[j],0], rows:rows, isArt:false, kind:'decision'});
+    }
+    var basis = new Array(m).fill(-1);
+    for(var i2=0;i2<m;i2++){
+      var rel = cons[i2].rel;
+      if(rel === '<='){
+        var r = new Array(m).fill(0); r[i2]=1;
+        columns.push({name:'s'+sub(i2+1), cost:[0,0], rows:r, isArt:false, kind:'slack'});
+        basis[i2] = columns.length-1;
+      } else if(rel === '>='){
+        var re = new Array(m).fill(0); re[i2]=-1;
+        columns.push({name:'e'+sub(i2+1), cost:[0,0], rows:re, isArt:false, kind:'surplus'});
+        var ra = new Array(m).fill(0); ra[i2]=1;
+        columns.push({name:'a'+sub(i2+1), cost:[0,-1], rows:ra, isArt:true, kind:'artificial'});
+        basis[i2] = columns.length-1;
+      } else {
+        var ra2 = new Array(m).fill(0); ra2[i2]=1;
+        columns.push({name:'a'+sub(i2+1), cost:[0,-1], rows:ra2, isArt:true, kind:'artificial'});
+        basis[i2] = columns.length-1;
+      }
+    }
+
+    var totalCols = columns.length;
+    var A = [];
+    for(var i3=0;i3<m;i3++){
+      var row = new Array(totalCols).fill(0);
+      for(var j3=0;j3<totalCols;j3++) row[j3] = columns[j3].rows[i3];
+      A.push(row);
+    }
+    var b = cons.map(function(c){ return c.rhs; });
+    var cj = columns.map(function(c){ return c.cost; });
+
+    var iterations = [];
+    var guard = 0;
+    var status = 'optimal';
+
+    while(guard++ < 60){
+      var zj = [];
+      for(var j4=0;j4<totalCols;j4++){
+        var acc = [0,0];
+        for(var i4=0;i4<m;i4++){
+          acc = pairAdd(acc, pairScale(cj[basis[i4]], A[i4][j4]));
+        }
+        zj.push(acc);
+      }
+      var deltaj = zj.map(function(z,j){ return pairSub(cj[j], z); });
+
+      var enterCol = -1, bestKey = [0,0];
+      for(var j5=0;j5<totalCols;j5++){
+        if(basis.indexOf(j5) !== -1) continue;
+        if(cmpPair(deltaj[j5], [EPS,EPS]) > 0){
+          if(enterCol === -1 || cmpPair(deltaj[j5], bestKey) > 0){
+            bestKey = deltaj[j5];
+            enterCol = j5;
+          }
+        }
+      }
+
+      var snap = {
+        A: A.map(function(r){ return r.slice(); }),
+        b: b.slice(),
+        basis: basis.slice(),
+        cj: cj,
+        zj: zj,
+        deltaj: deltaj,
+        enterCol: enterCol,
+        leaveRow: -1,
+        pivot: null,
+        ratios: null,
+        unbounded: false
+      };
+
+      if(enterCol === -1){
+        iterations.push(snap);
+        break;
+      }
+
+      var ratios = new Array(m).fill(null);
+      var leaveRow = -1, bestRatio = Infinity;
+      for(var i5=0;i5<m;i5++){
+        if(A[i5][enterCol] > EPS){
+          var ratio = b[i5] / A[i5][enterCol];
+          ratios[i5] = ratio;
+          if(ratio < bestRatio - EPS){
+            bestRatio = ratio; leaveRow = i5;
+          } else if(Math.abs(ratio-bestRatio) < EPS){
+            if(columns[basis[i5]].isArt && !columns[basis[leaveRow]].isArt) leaveRow = i5;
+          }
+        }
+      }
+      snap.ratios = ratios;
+
+      if(leaveRow === -1){
+        snap.unbounded = true;
+        iterations.push(snap);
+        status = 'unbounded';
+        break;
+      }
+
+      snap.leaveRow = leaveRow;
+      snap.pivot = A[leaveRow][enterCol];
+      iterations.push(snap);
+
+      var pv = A[leaveRow][enterCol];
+      for(var j6=0;j6<totalCols;j6++) A[leaveRow][j6] /= pv;
+      b[leaveRow] /= pv;
+      for(var i6=0;i6<m;i6++){
+        if(i6 === leaveRow) continue;
+        var factor = A[i6][enterCol];
+        if(Math.abs(factor) > EPS){
+          for(var j7=0;j7<totalCols;j7++) A[i6][j7] -= factor*A[leaveRow][j7];
+          b[i6] -= factor*b[leaveRow];
+        }
+      }
+      basis[leaveRow] = enterCol;
+    }
+
+    if(status === 'optimal'){
+      for(var i7=0;i7<m;i7++){
+        if(columns[basis[i7]].isArt && b[i7] > 1e-6) status = 'infeasible';
+      }
+    }
+
+    var xVals = new Array(n).fill(0);
+    for(var i8=0;i8<m;i8++){
+      if(basis[i8] < n) xVals[basis[i8]] = b[i8];
+    }
+    var zReal = 0;
+    for(var j8=0;j8<n;j8++) zReal += objCoeffs[j8]*xVals[j8];
+
+    return {status:status, iterations:iterations, columns:columns, n:n, m:m, xVals:xVals, z:zReal};
+  }
+
+  /* ---------------- rendering results ---------------- */
+  var results = document.getElementById('results');
+  var errMsg = document.getElementById('errMsg');
+
+  function renderIteration(result, snap, idx, isLast){
+    var columns = result.columns, m = result.m;
+    var hasRatio = snap.ratios !== null;
+
+    var html = '<div class="iter-card">';
+    html += '<div class="iter-heading"><span class="n">'+(idx===0?'Quadro Inicial':'Iteração '+idx)+'</span>';
+    if(isLast && result.status==='optimal') html += '<span class="badge">Ótimo</span>';
+    html += '</div>';
+
+    html += '<div class="table-scroll"><table class="tableau">';
+
+    // Cj row
+    html += '<thead><tr class="cj-row"><th>C<sub>j</sub></th><th></th>';
+    for(var j=0;j<columns.length;j++){
+      html += '<th class="'+(j===snap.enterCol?'col-enter':'')+'">'+fmtPair(columns[j].cost)+'</th>';
+    }
+    html += '<th></th>'+(hasRatio?'<th></th>':'')+'</tr>';
+
+    // header row
+    html += '<tr class="head-row"><th>Base</th><th>C<sub>B</sub></th>';
+    for(var j2=0;j2<columns.length;j2++){
+      html += '<th class="'+(j2===snap.enterCol?'col-enter':'')+'">'+columns[j2].name+'</th>';
+    }
+    html += '<th>b</th>'+(hasRatio?'<th>Razão</th>':'')+'</tr></thead>';
+
+    // body rows
+    html += '<tbody>';
+    for(var i=0;i<m;i++){
+      var isLeave = (i === snap.leaveRow);
+      html += '<tr class="'+(isLeave?'row-leave':'')+'">';
+      html += '<td class="base-name">'+columns[snap.basis[i]].name+'</td>';
+      html += '<td class="cb-val">'+fmtPair(columns[snap.basis[i]].cost)+'</td>';
+      for(var j3=0;j3<columns.length;j3++){
+        var isPivot = (i===snap.leaveRow && j3===snap.enterCol);
+        var cls = isPivot ? 'pivot-cell' : (j3===snap.enterCol ? 'col-enter' : '');
+        html += '<td class="'+cls+'">'+fmtNum(snap.A[i][j3])+'</td>';
+      }
+      html += '<td>'+fmtNum(snap.b[i])+'</td>';
+      if(hasRatio){
+        var rv = snap.ratios[i];
+        html += '<td class="ratio-col">'+(rv===null?'—':fmtNum(rv))+'</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody>';
+
+    // footer: Zj and Delta j
+    html += '<tfoot><tr><td>Z<sub>j</sub></td><td></td>';
+    for(var j4=0;j4<columns.length;j4++){
+      html += '<td class="'+(j4===snap.enterCol?'col-enter':'')+'">'+fmtPair(snap.zj[j4])+'</td>';
+    }
+    var zCurrent = [0,0];
+    for(var i2=0;i2<m;i2++) zCurrent = pairAdd(zCurrent, pairScale(columns[snap.basis[i2]].cost, snap.b[i2]));
+    html += '<td>'+fmtPair(zCurrent)+'</td>'+(hasRatio?'<td></td>':'')+'</tr>';
+
+    html += '<tr class="delta-row"><td>&Delta;<sub>j</sub></td><td></td>';
+    for(var j5=0;j5<columns.length;j5++){
+      html += '<td class="'+(j5===snap.enterCol?'col-enter':'')+'">'+fmtPair(snap.deltaj[j5])+'</td>';
+    }
+    html += '<td></td>'+(hasRatio?'<td></td>':'')+'</tr></tfoot>';
+
+    html += '</table></div>';
+
+    // note
+    if(snap.enterCol !== -1 && !snap.unbounded){
+      var enterName = columns[snap.enterCol].name;
+      var leaveName = columns[snap.basis[snap.leaveRow]].name;
+      html += '<div class="iter-note">A variável <b>'+enterName+'</b> tem o maior &Delta;<sub>j</sub> positivo &rarr; <b>entra na base</b> (azul).<br>'+
+        'A menor razão b/a pertence a <b>'+leaveName+'</b> &rarr; <b>sai da base</b> (amarelo). Elemento pivô: <b>'+fmtNum(snap.pivot)+'</b>.</div>';
+    } else if(snap.unbounded){
+      html += '<div class="iter-note">A coluna <b>'+columns[snap.enterCol].name+'</b> não tem coeficiente positivo nas restrições. <b>Problema ilimitado.</b></div>';
+    } else {
+      html += '<div class="iter-note">Todos os &Delta;<sub>j</sub> &le; 0. Nenhuma variável melhora Z. <b>Condição de otimalidade satisfeita.</b></div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function renderOutcome(result){
+    var html = '';
+    if(result.status === 'optimal'){
+      html += '<div class="outcome ok"><h3>Solução Ótima</h3>';
+      html += '<p>Ponto ótimo encontrado. Todas as restrições foram satisfeitas.</p>';
+      html += '<div class="z-star">Z* = '+fmtNum(result.z)+'</div>';
+      html += '<div class="var-grid">';
+      for(var j=0;j<result.n;j++){
+        html += '<div class="var-chip"><span class="k">x'+sub(j+1)+' =</span>'+fmtNum(result.xVals[j])+'</div>';
+      }
+      html += '</div></div>';
+    } else if(result.status === 'infeasible'){
+      html += '<div class="outcome bad"><h3>Problema Inviável</h3>';
+      html += '<p>O quadro chegou à otimalidade com variáveis artificiais ainda positivas na base. É impossível satisfazer todas as restrições simultaneamente.</p></div>';
+    } else if(result.status === 'unbounded'){
+      html += '<div class="outcome bad"><h3>Solução Ilimitada</h3>';
+      html += '<p>A variável escolhida para entrar pode crescer indefinidamente sem violar nenhuma restrição. A função objetivo não tem limite superior.</p></div>';
+    }
+    return html;
+  }
+
+  function solve(){
+    readModelFromDOM();
+    errMsg.className = 'err-msg';
+    errMsg.textContent = '';
+    results.classList.remove('show');
+
+    var n = model.obj.length;
+    if(model.obj.every(function(v){ return v===0; })){
+      errMsg.textContent = 'Defina ao menos um coeficiente não nulo na função objetivo.';
+      errMsg.className = 'err-msg show';
+      return;
+    }
+
+    var result;
+    try{
+      result = solveSimplex(model.type, model.obj.slice(), model.cons.map(function(c){ return {coef:c.coef.slice(), rel:c.rel, rhs:c.rhs}; }));
+    }catch(e){
+      errMsg.textContent = 'Erro ao tentar resolver: '+e.message;
+      errMsg.className = 'err-msg show';
+      return;
+    }
+
+    setTimeout(function() {
+      var html = '<div class="results-header"><h2>Passo a Passo</h2>';
+      
+      html += '</div>';
+              
+      for(var i=0;i<result.iterations.length;i++){
+        html += renderIteration(result, result.iterations[i], i, i===result.iterations.length-1);
+      }
+      html += renderOutcome(result);
+
+      results.innerHTML = html;
+      results.className = 'show';
+      results.scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block:'start'});
+    }, 50);
+  }
+
+  document.getElementById('solveBtn').addEventListener('click', solve);
+
+})();
+</script>
+</body>
+</html>
